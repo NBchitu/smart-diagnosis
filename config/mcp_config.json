@@ -1,0 +1,103 @@
+{
+  "servers": {
+    "ping": {
+      "name": "ping",
+      "description": "Ping网络连通性检测服务",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.ping_server_fixed"
+      ],
+      "env": {},
+      "url": null,
+      "timeout": 30,
+      "enabled": true
+    },
+    "wifi": {
+      "name": "wifi",
+      "description": "WiFi信号分析服务",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.wifi_server"
+      ],
+      "env": {},
+      "url": null,
+      "timeout": 30,
+      "enabled": true
+    },
+    "packet_capture": {
+      "name": "packet_capture",
+      "description": "智能网络抓包分析服务，专注于网络问题诊断",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.packet_capture_server"
+      ],
+      "env": {},
+      "url": null,
+      "timeout": 60,
+      "enabled": true
+    },
+    "gateway": {
+      "name": "gateway",
+      "description": "网关信息获取服务",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.gateway_server"
+      ],
+      "env": {},
+      "url": null,
+      "timeout": 30,
+      "enabled": false
+    },
+    "connectivity": {
+      "name": "connectivity",
+      "description": "网络连通性检查服务",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.connectivity_server"
+      ],
+      "env": {},
+      "url": null,
+      "timeout": 30,
+      "enabled": false
+    },
+    "sequential_thinking": {
+      "name": "sequential_thinking",
+      "description": "Sequential Thinking MCP服务器，用于智能排障思路整理",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.sequential_thinking_server"
+      ],
+      "env": {},
+      "timeout": 60,
+      "enabled": true
+    },
+    "network_diagnostic": {
+      "name": "network_diagnostic",
+      "description": "综合网络诊断服务，包含速度测试、WiFi扫描、信号分析等",
+      "transport": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "app.mcp.servers.network_diagnostic_server"
+      ],
+      "env": {},
+      "timeout": 120,
+      "enabled": true
+    }
+  },
+  "global_timeout": 60,
+  "max_concurrent_requests": 10,
+  "log_level": "INFO"
+}

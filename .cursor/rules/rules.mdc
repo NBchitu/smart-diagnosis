@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- 请记住，这些代码最终是在树莓派5系统下使用，因此需与之兼容，在前期调测时，我会在macos下运行
+- 技术栈请参考 [NETWORK_TESTER_DEVELOPMENT_PLAN.md](mdc:NETWORK_TESTER_DEVELOPMENT_PLAN.md)
+- 项目有大的修改后请保存至MD文件中，以便我利用这些资料编写这个项目开发的PPT教程，也便于后续回顾
+- 请尽可能拆分代码块，使用注释，保证后续的可维护性
+- 使用yarn来安装npm包
+- 请连续生成代码，不要偷懒，不要稍微写点代码就停下来询问！
