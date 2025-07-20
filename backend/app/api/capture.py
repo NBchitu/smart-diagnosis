@@ -206,6 +206,7 @@ async def run_capture(task_id: str, req: CaptureRequest):
 
         # 3. 预处理数据包
         tasks[task_id]['status'] = 'processing'
+        tasks[task_id]['pcap_file'] = pcap_file  # 保存pcap文件路径
         logger.info(f"开始预处理数据包: {pcap_file}")
 
         summary = preprocess_pcap(pcap_file, req.issue_type)
@@ -231,7 +232,9 @@ async def run_capture(task_id: str, req: CaptureRequest):
                             req.issue_type,
                             summary,
                             req.user_description,
-                            task_id
+                            task_id,
+                            filtered_domains=[],  # 抓包过程中的AI分析不使用筛选
+                            latency_filter='all'  # 抓包过程中的AI分析不使用筛选
                         )
                         logger.info("AI分析线程执行完成")
                         return result
@@ -1903,7 +1906,9 @@ async def test_ai_analysis():
         result = await ai_service.analyze_network_issue(
             issue_type="slow",
             capture_summary=test_capture_summary,
-            user_description="网络速度很慢，网页加载缓慢"
+            user_description="网络速度很慢，网页加载缓慢",
+            filtered_domains=[],  # 测试接口不使用筛选
+            latency_filter='all'  # 测试接口不使用筛选
         )
 
         return {
@@ -1923,7 +1928,12 @@ async def start_ai_analysis(request: dict):
     """启动AI分析（用于网站性能展示后的AI分析）"""
     try:
         task_id = request.get('task_id')
+        filtered_domains = request.get('filtered_domains', [])  # 筛选的域名列表
+        latency_filter = request.get('latency_filter', 'all')  # 速度分类筛选：all/fast/slow/error
+
         logger.info(f"收到AI分析请求，任务ID: {task_id}")
+        logger.info(f"筛选域名: {filtered_domains}")
+        logger.info(f"速度分类筛选: {latency_filter}")
 
         if not task_id:
             raise HTTPException(status_code=400, detail="缺少任务ID")
@@ -1961,7 +1971,7 @@ async def start_ai_analysis(request: dict):
         logger.info(f"开始AI分析: {task_id}")
 
         # 异步启动AI分析
-        asyncio.create_task(run_ai_analysis_async(task_id))
+        asyncio.create_task(run_ai_analysis_async(task_id, filtered_domains, latency_filter))
 
         return {"message": "AI分析已启动", "task_id": task_id}
 
@@ -1978,7 +1988,7 @@ async def start_ai_analysis(request: dict):
 
         raise HTTPException(status_code=500, detail=f"启动AI分析失败: {str(e)}")
 
-async def run_ai_analysis_async(task_id: str):
+async def run_ai_analysis_async(task_id: str, filtered_domains: List[str] = None, latency_filter: str = 'all'):
     """异步运行AI分析"""
     task = tasks.get(task_id)
     if not task or task is None:
@@ -2012,7 +2022,9 @@ async def run_ai_analysis_async(task_id: str):
         ai_result = await ai_service.analyze_network_issue(
             issue_type=task.get('issue_type', 'unknown'),
             capture_summary=capture_summary,
-            user_description=task.get('user_description', '')
+            user_description=task.get('user_description', ''),
+            filtered_domains=filtered_domains,
+            latency_filter=latency_filter
         )
 
         logger.info(f"AI分析完成，结果: {ai_result.get('success', False)}")
@@ -2061,3 +2073,42 @@ async def run_ai_analysis_async(task_id: str):
                 }
             }
             task['result'] = result
+
+@router.get("/download")
+async def download_raw_packets(task_id: str = Query(..., description="任务ID")):
+    """下载原始数据包文件"""
+    try:
+        if task_id not in tasks:
+            raise HTTPException(status_code=404, detail="任务不存在")
+
+        task = tasks[task_id]
+
+        # 检查原始数据包文件是否存在
+        pcap_file = task.get('pcap_file')
+        if not pcap_file or not os.path.exists(pcap_file):
+            raise HTTPException(status_code=404, detail="原始数据包文件不存在")
+
+        # 读取文件内容
+        with open(pcap_file, 'rb') as f:
+            file_content = f.read()
+
+        # 生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"capture_{task_id}_{timestamp}.pcap"
+
+        from fastapi.responses import Response
+
+        return Response(
+            content=file_content,
+            media_type='application/octet-stream',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Length': str(len(file_content))
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"下载原始数据包失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"下载失败: {str(e)}")

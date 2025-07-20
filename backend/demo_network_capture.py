@@ -148,7 +148,9 @@ async def demo_ai_analysis():
         result = await ai_service.analyze_network_issue(
             issue_type='dns',
             capture_summary=mock_capture_summary,
-            user_description='DNS解析经常超时，网站打开很慢'
+            user_description='DNS解析经常超时，网站打开很慢',
+            filtered_domains=[],  # 演示代码不使用筛选
+            latency_filter='all'  # 演示代码不使用筛选
         )
         
         if result['success']:

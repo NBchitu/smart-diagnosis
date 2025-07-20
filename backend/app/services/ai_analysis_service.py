@@ -6,7 +6,8 @@ AI网络分析服务
 import logging
 import json
 import os
-from typing import Dict, Any, Optional
+import copy
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 from pathlib import Path
 
@@ -85,7 +86,9 @@ class AIAnalysisService:
             logger.error(f"更新调试数据失败: {str(e)}")
     
     def analyze_network_issue_sync(self, issue_type: str, capture_summary: Dict,
-                                 user_description: Optional[str] = None, task_id: str = None) -> Dict[str, Any]:
+                                 user_description: Optional[str] = None, task_id: str = None,
+                                 filtered_domains: Optional[List[str]] = None,
+                                 latency_filter: Optional[str] = None) -> Dict[str, Any]:
         """
         同步版本的网络问题分析，避免事件循环冲突
         """
@@ -103,7 +106,8 @@ class AIAnalysisService:
             logger.info(f"使用AI提供商: {self.ai_config.current_provider}")
 
             # 生成分析prompt
-            prompt = self._generate_analysis_prompt(issue_type, capture_summary, user_description)
+            prompt = self._generate_analysis_prompt(issue_type, capture_summary, user_description,
+                                                  filtered_domains, latency_filter)
             logger.info(f"生成prompt长度: {len(prompt)} 字符")
 
             # 保存调试数据（输入部分）
@@ -146,7 +150,8 @@ class AIAnalysisService:
             # 即使失败也保存调试数据
             if task_id and ai_response is None:
                 try:
-                    prompt = self._generate_analysis_prompt(issue_type, capture_summary, user_description)
+                    prompt = self._generate_analysis_prompt(issue_type, capture_summary, user_description,
+                                                          filtered_domains, latency_filter)
                     debug_file_path = self._save_debug_data(
                         task_id, issue_type, capture_summary,
                         user_description or "", prompt, f"ERROR: {str(e)}"
@@ -166,7 +171,9 @@ class AIAnalysisService:
             return result
 
     async def analyze_network_issue(self, issue_type: str, capture_summary: Dict,
-                                  user_description: Optional[str] = None) -> Dict[str, Any]:
+                                  user_description: Optional[str] = None,
+                                   filtered_domains: Optional[List[str]] = None,
+                                   latency_filter: Optional[str] = None) -> Dict[str, Any]:
         """
         分析网络问题
 
@@ -174,15 +181,22 @@ class AIAnalysisService:
             issue_type: 问题类型 (website_access, interconnection, game_lag, custom)
             capture_summary: 抓包数据摘要
             user_description: 用户描述的问题
+            filtered_domains: 筛选的域名列表，只分析这些域名
+            latency_filter: 速度分类筛选 (all/fast/slow/error)
 
         Returns:
             AI分析结果
         """
         try:
             logger.info(f"开始AI分析，问题类型: {issue_type}")
+            if filtered_domains:
+                logger.info(f"筛选域名: {filtered_domains}")
+            if latency_filter and latency_filter != 'all':
+                logger.info(f"速度分类筛选: {latency_filter}")
 
             # 生成分析prompt
-            prompt = self._generate_analysis_prompt(issue_type, capture_summary, user_description)
+            prompt = self._generate_analysis_prompt(issue_type, capture_summary, user_description,
+                                                  filtered_domains, latency_filter)
             logger.info(f"生成的prompt长度: {len(prompt)} 字符")
 
             # 使用同步方法调用AI API（避免异步问题）
@@ -227,8 +241,10 @@ class AIAnalysisService:
                 }
             }
     
-    def _generate_analysis_prompt(self, issue_type: str, capture_summary: Dict, 
-                                user_description: Optional[str] = None) -> str:
+    def _generate_analysis_prompt(self, issue_type: str, capture_summary: Dict,
+                                user_description: Optional[str] = None,
+                                filtered_domains: Optional[List[str]] = None,
+                                latency_filter: Optional[str] = None) -> str:
         """生成AI分析prompt"""
         
         # 基础prompt模板
@@ -240,8 +256,41 @@ class AIAnalysisService:
 3. 提供具体的问题定位和解决步骤
 4. 给出优化建议和预防措施
 
-请按照以下JSON格式回复：
-{
+请按照以下JSON格式回复："""
+
+        # 初始化prompt
+        prompt = base_prompt
+
+        # 检查是否有筛选条件
+        has_domain_filter = filtered_domains and len(filtered_domains) > 0
+        has_latency_filter = latency_filter and latency_filter != 'all'
+
+        # 根据是否有筛选条件动态生成JSON格式模板
+        if has_domain_filter or has_latency_filter:
+            json_template = """{
+    "diagnosis": "简洁明确的问题诊断结论（仅针对筛选的域名）",
+    "severity": "严重程度(low/medium/high/critical)",
+    "root_cause": "详细的根本原因分析，包括技术细节（基于筛选后的数据）",
+    "key_findings": [
+        "关键发现1：具体的数据异常（仅涉及筛选域名）",
+        "关键发现2：性能指标问题（仅涉及筛选域名）"
+    ],
+    "recommendations": [
+        "立即行动：紧急解决步骤（针对筛选的域名）",
+        "短期优化：具体的配置调整（针对筛选的域名）",
+        "长期改进：系统性优化建议"
+    ],
+    "diagnostic_clues": [
+        "📊 具体的性能数据分析（仅筛选域名的数据）",
+        "🔍 异常流量模式发现（仅筛选域名的流量）",
+        "⚠️ 潜在风险点识别（仅筛选域名相关）"
+    ],
+    "technical_details": "深入的技术分析和数据解读（严格限制在筛选域名范围内）",
+    "confidence": "诊断置信度(0-100)",
+    "next_steps": "建议的后续监控和验证步骤（针对筛选的域名）"
+}"""
+        else:
+            json_template = """{
     "diagnosis": "简洁明确的问题诊断结论",
     "severity": "严重程度(low/medium/high/critical)",
     "root_cause": "详细的根本原因分析，包括技术细节",
@@ -262,10 +311,10 @@ class AIAnalysisService:
     "technical_details": "深入的技术分析和数据解读",
     "confidence": "诊断置信度(0-100)",
     "next_steps": "建议的后续监控和验证步骤"
-}
+}"""
 
-"""
-        
+        prompt += json_template
+
         # 重新设计的问题类型特定指导 - 专注于三大核心功能
         issue_specific_prompts = {
             'website_access': """
@@ -422,12 +471,61 @@ class AIAnalysisService:
                 prompt += f"- 访问域名数: {http.get('unique_domains', 'N/A')}\n"
                 prompt += f"- HTTPS比例: {http.get('https_ratio', 0)*100:.1f}%\n"
 
+        # 根据筛选条件过滤抓包数据
+        filtered_capture_summary = self._filter_capture_data(capture_summary, filtered_domains, latency_filter)
+
+        # 添加筛选信息
+        if has_domain_filter or has_latency_filter:
+            prompt += "\n🔍 分析范围筛选：\n"
+            if has_domain_filter:
+                prompt += f"- 筛选域名: {', '.join(filtered_domains)}\n"
+            if has_latency_filter:
+                filter_desc = {
+                    'fast': '快速网站 (延迟 ≤ 50ms)',
+                    'slow': '慢速网站 (延迟 > 100ms)',
+                    'error': '有错误的网站 (错误率 > 0%)'
+                }
+                prompt += f"- 速度分类: {filter_desc.get(latency_filter, latency_filter)}\n"
+
+            prompt += "\n⚠️ 重要提示：\n"
+            prompt += "1. 用户已经筛选了特定的域名，请只分析上述筛选范围内的域名\n"
+            prompt += "2. 不要分析或提及筛选范围之外的其他域名\n"
+            prompt += "3. 所有诊断、建议和技术细节都应该专注于筛选后的域名\n"
+            prompt += "4. 如果筛选后的域名数据不足，请明确说明并基于现有数据进行分析\n\n"
+
         # 添加详细的抓包数据
-        prompt += f"\n📋 详细抓包数据：\n{json.dumps(capture_summary, indent=2, ensure_ascii=False)}\n"
+        prompt += f"\n📋 详细抓包数据：\n{json.dumps(filtered_capture_summary, indent=2, ensure_ascii=False)}\n"
 
         # 添加分析要求
-        prompt += """
-🎯 分析要求：
+        analysis_scope_note = ""
+        if filtered_domains or (latency_filter and latency_filter != 'all'):
+            analysis_scope_note = f"""
+🎯 分析范围限制：
+- 本次分析仅针对用户筛选的域名进行
+- 请勿分析或提及筛选范围外的其他域名
+- 所有结论和建议都应基于筛选后的数据
+
+"""
+
+        # 根据是否有筛选条件调整分析要求
+        if has_domain_filter or has_latency_filter:
+            analysis_requirements = f"""{analysis_scope_note}🎯 分析要求：
+1. 重点关注异常指标和性能瓶颈（仅限筛选范围内的域名）
+2. 提供具体的数值分析和对比（基于筛选后的数据）
+3. 给出可操作的解决步骤（针对筛选的域名）
+4. 包含预防措施和监控建议
+5. 评估问题的紧急程度和影响范围
+
+请严格按照上述JSON格式回复，确保所有字段都有实际内容。
+
+⚠️ 最终提醒：用户已筛选特定域名，请确保：
+1. 诊断结论只基于筛选后的域名数据
+2. 关键发现只涉及筛选的域名
+3. 建议措施只针对筛选的域名
+4. 技术细节只分析筛选范围内的数据
+5. 不要提及或分析筛选范围外的任何域名"""
+        else:
+            analysis_requirements = """🎯 分析要求：
 1. 重点关注异常指标和性能瓶颈
 2. 提供具体的数值分析和对比
 3. 给出可操作的解决步骤
@@ -436,7 +534,95 @@ class AIAnalysisService:
 
 请严格按照上述JSON格式回复，确保所有字段都有实际内容："""
 
+        prompt += analysis_requirements
+
         return prompt
+
+    def _filter_capture_data(self, capture_summary: Dict, filtered_domains: Optional[List[str]] = None,
+                           latency_filter: Optional[str] = None) -> Dict:
+        """
+        根据筛选条件过滤抓包数据，只保留用户关心的域名数据
+        """
+        if not filtered_domains and (not latency_filter or latency_filter == 'all'):
+            # 没有筛选条件，返回原始数据
+            return capture_summary
+
+        # 深拷贝原始数据
+        filtered_data = copy.deepcopy(capture_summary)
+
+        try:
+            # 获取网站访问数据和性能数据
+            enhanced_analysis = filtered_data.get('enhanced_analysis', {})
+            http_analysis = enhanced_analysis.get('http_analysis', {})
+            websites_accessed = http_analysis.get('websites_accessed', {})
+
+            issue_specific_insights = enhanced_analysis.get('issue_specific_insights', {})
+            website_performance = issue_specific_insights.get('website_performance', {})
+
+            # 如果有域名筛选，先按域名过滤
+            if filtered_domains:
+                # 过滤网站访问数据
+                filtered_websites_accessed = {
+                    domain: count for domain, count in websites_accessed.items()
+                    if domain in filtered_domains
+                }
+
+                # 过滤网站性能数据
+                filtered_website_performance = {
+                    domain: perf_data for domain, perf_data in website_performance.items()
+                    if domain in filtered_domains
+                }
+
+                # 更新数据
+                http_analysis['websites_accessed'] = filtered_websites_accessed
+                issue_specific_insights['website_performance'] = filtered_website_performance
+
+            # 如果有速度分类筛选，进一步过滤
+            if latency_filter and latency_filter != 'all':
+                filtered_by_speed = {}
+
+                for domain, perf_data in issue_specific_insights.get('website_performance', {}).items():
+                    should_include = False
+
+                    if latency_filter == 'fast':
+                        # 快速：延迟 <= 50ms
+                        latency = perf_data.get('tcp_rtt', {}).get('avg_ms', 0)
+                        should_include = latency > 0 and latency <= 50
+                    elif latency_filter == 'slow':
+                        # 慢速：延迟 > 100ms
+                        latency = perf_data.get('tcp_rtt', {}).get('avg_ms', 0)
+                        should_include = latency > 100
+                    elif latency_filter == 'error':
+                        # 错误：错误率 > 0%
+                        error_rate = perf_data.get('requests', {}).get('error_rate_percent', 0)
+                        should_include = error_rate > 0
+
+                    if should_include:
+                        filtered_by_speed[domain] = perf_data
+
+                # 更新性能数据
+                issue_specific_insights['website_performance'] = filtered_by_speed
+
+                # 同步更新访问数据
+                filtered_websites_accessed = {
+                    domain: count for domain, count in http_analysis.get('websites_accessed', {}).items()
+                    if domain in filtered_by_speed
+                }
+                http_analysis['websites_accessed'] = filtered_websites_accessed
+
+            # 更新统计信息
+            remaining_domains = len(http_analysis.get('websites_accessed', {}))
+            if 'connection_summary' in http_analysis:
+                http_analysis['connection_summary']['total_websites'] = remaining_domains
+                http_analysis['connection_summary']['filtered_analysis'] = True
+
+            logger.info(f"域名筛选完成，剩余域名数量: {remaining_domains}")
+
+        except Exception as e:
+            logger.warning(f"数据筛选失败，使用原始数据: {str(e)}")
+            return capture_summary
+
+        return filtered_data
 
     def _call_ai_api_sync(self, prompt: str) -> str:
         """同步版本的AI API调用"""
@@ -647,17 +833,56 @@ class AIAnalysisService:
                 {'role': 'user', 'content': prompt}
             ]
         )
-        
+
         return response.content[0].text
-    
+
+    def _validate_analysis_result(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """验证和补充分析结果"""
+        # 验证和补充必要字段
+        required_fields = {
+            'diagnosis': '网络问题分析中',
+            'severity': 'medium',
+            'root_cause': '正在分析根本原因',
+            'recommendations': ['请稍后查看详细分析结果'],
+            'technical_details': '技术分析进行中',
+            'confidence': 70
+        }
+
+        for field, default_value in required_fields.items():
+            if field not in analysis:
+                analysis[field] = default_value
+
+        # 确保列表字段是列表格式
+        list_fields = ['recommendations', 'key_findings', 'diagnostic_clues']
+        for field in list_fields:
+            if field in analysis and not isinstance(analysis[field], list):
+                analysis[field] = [str(analysis[field])] if analysis[field] else []
+            elif field not in analysis:
+                analysis[field] = []
+
+        # 确保数值字段是数字
+        if 'confidence' in analysis:
+            try:
+                analysis['confidence'] = int(analysis['confidence'])
+            except (ValueError, TypeError):
+                analysis['confidence'] = 70
+
+        return analysis
+
     def _parse_ai_response(self, ai_response: str, issue_type: str) -> Dict[str, Any]:
         """解析AI响应"""
         try:
             logger.info(f"开始解析AI响应，长度: {len(ai_response)} 字符")
             logger.debug(f"AI响应前100字符: {ai_response[:100]}")
 
-            # 清理响应文本
-            cleaned_response = ai_response.strip()
+            # 清理响应文本 - 移除控制字符和不可见字符
+            import re
+            # 移除控制字符（除了换行符、制表符和回车符）
+            cleaned_response = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', ai_response)
+            # 清理首尾空白
+            cleaned_response = cleaned_response.strip()
+
+            logger.debug(f"清理后响应前100字符: {cleaned_response[:100]}")
 
             # 尝试解析JSON响应
             if cleaned_response.startswith('{') and cleaned_response.endswith('}'):
@@ -712,37 +937,50 @@ class AIAnalysisService:
                         'next_steps': '建议重新进行分析以获得结构化结果'
                     }
             
-            # 验证和补充必要字段
-            required_fields = {
-                'diagnosis': '网络问题分析中',
-                'severity': 'medium',
-                'root_cause': '正在分析根本原因',
-                'recommendations': ['请稍后查看详细分析结果'],
-                'technical_details': '技术分析进行中',
-                'confidence': 70
+            return self._validate_analysis_result(analysis)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析失败: {str(e)}", exc_info=True)
+
+            # 详细的JSON错误调试
+            try:
+                # 找到错误位置的字符
+                error_char = ai_response[e.pos] if e.pos < len(ai_response) else 'EOF'
+                error_context = ai_response[max(0, e.pos-20):e.pos+20] if e.pos < len(ai_response) else ai_response[-40:]
+
+                logger.error(f"JSON错误位置: 第{e.lineno}行第{e.colno}列")
+                logger.error(f"错误字符: '{error_char}' (ASCII: {ord(error_char) if error_char != 'EOF' else 'EOF'})")
+                logger.error(f"错误上下文: {repr(error_context)}")
+
+                # 尝试更激进的清理
+                import re
+                super_cleaned = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', ai_response)  # 移除所有控制字符
+                super_cleaned = re.sub(r'[^\x20-\x7E\u4e00-\u9fff]', '', super_cleaned)  # 只保留可打印ASCII和中文
+                super_cleaned = super_cleaned.strip()
+
+                logger.info("尝试超级清理后重新解析JSON")
+                if super_cleaned.startswith('{') and super_cleaned.endswith('}'):
+                    analysis = json.loads(super_cleaned)
+                    logger.info("超级清理后JSON解析成功")
+                    return self._validate_analysis_result(analysis)
+
+            except Exception as cleanup_error:
+                logger.error(f"清理重试也失败: {cleanup_error}")
+
+            # JSON解析失败的调试信息
+            debug_info = {
+                'error': str(e),
+                'error_type': 'JSONDecodeError',
+                'line': e.lineno,
+                'column': e.colno,
+                'position': e.pos,
+                'ai_response_length': len(ai_response),
+                'ai_response_preview': ai_response[:300],
+                'issue_type': issue_type,
+                'timestamp': datetime.now().isoformat()
             }
+            logger.error(f"JSON解析调试信息: {debug_info}")
 
-            for field, default_value in required_fields.items():
-                if field not in analysis:
-                    analysis[field] = default_value
-
-            # 确保列表字段是列表格式
-            list_fields = ['recommendations', 'key_findings', 'diagnostic_clues']
-            for field in list_fields:
-                if field in analysis and not isinstance(analysis[field], list):
-                    analysis[field] = [str(analysis[field])] if analysis[field] else []
-                elif field not in analysis:
-                    analysis[field] = []
-
-            # 确保数值字段是数字
-            if 'confidence' in analysis:
-                try:
-                    analysis['confidence'] = int(analysis['confidence'])
-                except (ValueError, TypeError):
-                    analysis['confidence'] = 70
-
-            return analysis
-            
         except Exception as e:
             logger.error(f"解析AI响应失败: {str(e)}", exc_info=True)
             logger.error(f"AI响应内容: {ai_response[:500]}...")
