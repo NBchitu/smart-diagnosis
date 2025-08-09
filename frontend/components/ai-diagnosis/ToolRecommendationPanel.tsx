@@ -51,6 +51,7 @@ interface ToolRecommendationPanelProps {
   onRefresh?: () => void;
   onToolExecute?: (toolId: string, parameters: Record<string, any>) => void;
   onToolResult?: (toolId: string, result: any) => void;
+  onPacketCaptureOpen?: () => void; // 新增：数据包分析对话框打开回调
   isLoading?: boolean;
 }
 
@@ -59,6 +60,7 @@ export function ToolRecommendationPanel({
   onRefresh,
   onToolExecute,
   onToolResult,
+  onPacketCaptureOpen,
   isLoading = false
 }: ToolRecommendationPanelProps) {
   const [isAnalysisExpanded, setIsAnalysisExpanded] = useState(false);
@@ -212,6 +214,7 @@ export function ToolRecommendationPanel({
             recommendation={recommendation}
             onExecute={handleToolExecute}
             onResult={handleToolResult}
+            onPacketCaptureOpen={onPacketCaptureOpen}
             disabled={isLoading}
           />
         ))}

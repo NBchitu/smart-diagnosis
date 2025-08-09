@@ -129,6 +129,57 @@ const TOOL_TEMPLATES: Record<string, Omit<ToolRecommendation, 'reasoning'>> = {
     ],
     apiEndpoint: '/api/network-ping'
   },
+  speed_test: {
+    id: 'speed_test',
+    name: '网络测速',
+    description: '测试网络上传下载速度和延迟',
+    category: 'network',
+    priority: 'high',
+    icon: '⚡',
+    estimatedDuration: '30-60秒',
+    parameters: [],
+    apiEndpoint: '/api/speed-test'
+  },
+  traceroute: {
+    id: 'traceroute',
+    name: '路由追踪',
+    description: '追踪数据包到目标主机的传输路径',
+    category: 'network',
+    priority: 'high',
+    icon: '🛤️',
+    estimatedDuration: '15-30秒',
+    parameters: [
+      {
+        name: 'host',
+        type: 'string',
+        label: '目标主机',
+        defaultValue: 'baidu.com',
+        required: true,
+        description: '要追踪路由的主机地址或域名'
+      }
+    ],
+    apiEndpoint: '/api/traceroute'
+  },
+  dns_test: {
+    id: 'dns_test',
+    name: 'DNS测试',
+    description: '测试域名解析速度和准确性',
+    category: 'connectivity',
+    priority: 'high',
+    icon: '🌐',
+    estimatedDuration: '10-20秒',
+    parameters: [
+      {
+        name: 'domain',
+        type: 'string',
+        label: '域名',
+        defaultValue: 'baidu.com',
+        required: true,
+        description: '要测试解析的域名'
+      }
+    ],
+    apiEndpoint: '/api/dns-test'
+  },
   wifi_scan: {
     id: 'wifi_scan',
     name: 'WiFi扫描',
@@ -199,6 +250,74 @@ const TOOL_TEMPLATES: Record<string, Omit<ToolRecommendation, 'reasoning'>> = {
       }
     ],
     apiEndpoint: '/api/packet-capture'
+  },
+  port_scan: {
+    id: 'port_scan',
+    name: '端口扫描',
+    description: '检测目标主机的开放端口',
+    category: 'packet',
+    priority: 'medium',
+    icon: '🔍',
+    estimatedDuration: '20-40秒',
+    parameters: [
+      {
+        name: 'host',
+        type: 'string',
+        label: '目标主机',
+        defaultValue: 'baidu.com',
+        required: true,
+        description: '要扫描的主机地址或域名'
+      },
+      {
+        name: 'ports',
+        type: 'string',
+        label: '端口范围',
+        defaultValue: '80,443,22,21,25,53',
+        required: false,
+        description: '要扫描的端口，用逗号分隔'
+      }
+    ],
+    apiEndpoint: '/api/port-scan'
+  },
+  ssl_check: {
+    id: 'ssl_check',
+    name: 'SSL证书检查',
+    description: '检查网站SSL证书状态和安全性',
+    category: 'connectivity',
+    priority: 'medium',
+    icon: '🔒',
+    estimatedDuration: '5-10秒',
+    parameters: [
+      {
+        name: 'host',
+        type: 'string',
+        label: '网站地址',
+        defaultValue: 'baidu.com',
+        required: true,
+        description: '要检查SSL证书的网站域名'
+      }
+    ],
+    apiEndpoint: '/api/ssl-check'
+  },
+  network_quality: {
+    id: 'network_quality',
+    name: '网络质量监控',
+    description: '持续监控网络质量指标',
+    category: 'network',
+    priority: 'low',
+    icon: '📊',
+    estimatedDuration: '60-120秒',
+    parameters: [
+      {
+        name: 'duration',
+        type: 'number',
+        label: '监控时长(秒)',
+        defaultValue: 60,
+        required: false,
+        description: '网络质量监控的持续时间'
+      }
+    ],
+    apiEndpoint: '/api/network-quality'
   }
 };
 
@@ -210,11 +329,22 @@ async function analyzeUserProblem(message: string, aiModel: any): Promise<any> {
 用户问题：${message}
 
 可用的诊断工具：
-1. ping - 测试网络连通性和延迟
-2. wifi_scan - 扫描WiFi网络
-3. connectivity_check - 全面连通性检查
-4. gateway_info - 获取网关信息
-5. packet_capture - 数据包分析
+基础诊断工具：
+1. ping - 测试网络连通性、延迟及稳定性。
+2. speed_test - 测试网络上传下载速度。
+3. wifi_scan - 扫描WiFi网络，发现WiFi信号弱覆盖或者干扰引起的网络不稳定。
+4. connectivity_check - 全面的网络连通性检查，用于对比各家运营商的网络连通性差异，通常用来验证用户所反馈的在中国移动网络下无法访问网站或app，但在电信下却可以访问的问题。
+
+高级诊断工具：
+5. traceroute - 追踪数据包传输路径，用于深入发现哪个环节产生了丢包
+6. dns_test - 测试域名解析速度，用户发现是否因为DNS配置错误导致的CDN分配问题，比如中国移动用户配置了电信DNS，导致分配到电信CDN，引起视频、游戏跨运营商访问产生的网速慢/加载缓慢问题
+7. gateway_info - 获取网关信息
+8. packet_capture - 数据包分析，通过网络抓包来发现深层次的网络问题，比如互联互通问题
+
+专业诊断工具（很少用到）：
+9. port_scan - 检测主机开放端口
+10. ssl_check - 检查SSL证书状态
+11. network_quality - 持续监控网络质量
 
 请以JSON格式回复，包含：
 {
@@ -227,7 +357,7 @@ async function analyzeUserProblem(message: string, aiModel: any): Promise<any> {
 }
 
 要求：
-1. 分析要详细准确
+1. 要仔细分析用户问题描述,给出的诊断步骤要符合逻辑
 2. 工具顺序要合理（从基础到高级）
 3. 每步都要有明确的诊断目的
 4. 通常2-4个步骤比较合适
@@ -240,7 +370,11 @@ async function analyzeUserProblem(message: string, aiModel: any): Promise<any> {
   });
 
   try {
+    console.log(`==============AI网络诊断结果-Start==============`);
+    console.log(text);
+    console.log(`==============AI网络诊断结果-End==============`);
     return JSON.parse(text);
+    
   } catch (error) {
     console.error('❌ AI分析结果解析失败:', error);
     return {

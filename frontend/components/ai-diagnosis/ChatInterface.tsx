@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { PingResultCard } from './PingResultCard';
 import { PacketCaptureResultCard } from './PacketCaptureResultCard';
 import { PacketCaptureStatusCard } from './PacketCaptureStatusCard';
+import { ToolsPanel } from './ToolsPanel';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -18,6 +19,7 @@ interface ChatInterfaceProps {
   isLoading: boolean;
   placeholder?: string;
   onPacketCaptureCompleted?: (analysisResult: any) => void;
+  onToolSelect?: (toolId: string) => void;
 }
 
 // 抓包会话状态接口
@@ -101,7 +103,8 @@ export function ChatInterface({
   handleSubmit,
   isLoading,
   placeholder = "请描述您遇到的问题...",
-  onPacketCaptureCompleted
+  onPacketCaptureCompleted,
+  onToolSelect
 }: ChatInterfaceProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -1140,33 +1143,52 @@ export function ChatInterface({
       </div>
 
       {/* 输入区域 */}
-      <div className="border-t bg-white p-4">
-        <form ref={formRef} onSubmit={handleSubmit} className="flex gap-2">
-          <div className="flex-1 relative">
-            <TextareaAutosize
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              className="w-full resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              minRows={1}
-              maxRows={4}
-              disabled={isLoading}
-            />
+      <div className="border-t bg-white">
+        {/* 工具面板区域 */}
+        <div className="px-4 pt-3 pb-2 bg-gradient-to-r from-blue-50/50 via-indigo-50/50 to-purple-50/50 border-b border-blue-100/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">快速诊断工具</span>
           </div>
-          <Button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            size="sm"
-            className="px-3"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
+          <div className="flex space-x-2">
+            {onToolSelect && (
+              <ToolsPanel
+                onToolSelect={onToolSelect}
+                disabled={isLoading}
+              />
             )}
-          </Button>
-        </form>
+          </div>
+        </div>
+
+        {/* 输入框区域 */}
+        <div className="p-4">
+          <form ref={formRef} onSubmit={handleSubmit} className="flex gap-2" suppressHydrationWarning={true}>
+            <div className="flex-1 relative">
+              <TextareaAutosize
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                className="w-full resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                minRows={1}
+                maxRows={4}
+                disabled={isLoading}
+                suppressHydrationWarning={true}
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              size="sm"
+              className="px-3"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

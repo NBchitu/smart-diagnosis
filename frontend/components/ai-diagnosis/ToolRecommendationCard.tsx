@@ -42,6 +42,7 @@ interface ToolRecommendationCardProps {
   recommendation: ToolRecommendation;
   onExecute?: (toolId: string, parameters: Record<string, any>) => void;
   onResult?: (toolId: string, result: any) => void;
+  onPacketCaptureOpen?: () => void; // 新增：数据包分析对话框打开回调
   disabled?: boolean;
 }
 
@@ -49,6 +50,7 @@ export function ToolRecommendationCard({
   recommendation,
   onExecute,
   onResult,
+  onPacketCaptureOpen,
   disabled = false
 }: ToolRecommendationCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -93,6 +95,12 @@ export function ToolRecommendationCard({
   // 执行工具
   const handleExecute = async () => {
     if (disabled || isExecuting) return;
+
+    // 特殊处理：数据包分析工具打开全屏对话框
+    if (recommendation.id === 'packet_capture' && onPacketCaptureOpen) {
+      onPacketCaptureOpen();
+      return;
+    }
 
     try {
       setIsExecuting(true);

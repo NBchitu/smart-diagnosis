@@ -200,6 +200,7 @@ ${analysisResult.ai_analysis || '暂无AI分析结果'}
                   isLoading={isLoading}
                   placeholder="请描述您遇到的网络问题 (例如: 网速缓慢、连接不稳定、无法访问特定网站等...)"
                   onPacketCaptureCompleted={handlePacketCaptureCompleted}
+                  onToolSelect={handleToolSelect}
                 />
               </CardContent>
             </Card>

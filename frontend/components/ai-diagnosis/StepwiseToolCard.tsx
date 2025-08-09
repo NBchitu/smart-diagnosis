@@ -43,6 +43,7 @@ interface ToolRecommendation {
 interface StepwiseToolCardProps {
   recommendation: ToolRecommendation;
   onExecute: (toolId: string, parameters: Record<string, any>) => void;
+  onPacketCaptureOpen?: () => void; // 新增：数据包分析对话框打开回调
   isLoading?: boolean;
   stepNumber?: number;
 }
@@ -50,6 +51,7 @@ interface StepwiseToolCardProps {
 export function StepwiseToolCard({
   recommendation,
   onExecute,
+  onPacketCaptureOpen,
   isLoading = false,
   stepNumber
 }: StepwiseToolCardProps) {
@@ -120,6 +122,12 @@ export function StepwiseToolCard({
 
   // 处理工具执行
   const handleExecute = () => {
+    // 特殊处理：数据包分析工具打开全屏对话框
+    if (recommendation.id === 'packet_capture' && onPacketCaptureOpen) {
+      onPacketCaptureOpen();
+      return;
+    }
+
     // 为必需参数设置默认值
     const finalParams = { ...parameters };
     recommendation.parameters.forEach(param => {
@@ -127,7 +135,7 @@ export function StepwiseToolCard({
         finalParams[param.name] = param.defaultValue || '';
       }
     });
-    
+
     onExecute(recommendation.id, finalParams);
   };
 

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { ToolRecommendationPanel } from './ToolRecommendationPanel';
 import { PingResultCard } from './PingResultCard';
 import { PacketCaptureResultCard } from './PacketCaptureResultCard';
+import { PacketCaptureFullscreenDialog } from './PacketCaptureFullscreenDialog';
 
 // 消息类型定义
 interface ChatMessage {
@@ -43,6 +44,7 @@ export function SmartDiagnosisChatInterface({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isPacketCaptureDialogOpen, setIsPacketCaptureDialogOpen] = useState(false);
 
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {
@@ -319,6 +321,7 @@ export function SmartDiagnosisChatInterface({
             onRefresh={() => handleRefreshAnalysis(message.data)}
             onToolExecute={handleToolExecute}
             onToolResult={handleToolResult}
+            onPacketCaptureOpen={() => setIsPacketCaptureDialogOpen(true)}
             isLoading={isLoading}
           />
         </div>
@@ -427,7 +430,7 @@ export function SmartDiagnosisChatInterface({
 
       {/* 输入区域 */}
       <div className="border-t bg-white p-4">
-        <form ref={formRef} onSubmit={handleSubmit} className="flex gap-2">
+        <form ref={formRef} onSubmit={handleSubmit} className="flex gap-2" suppressHydrationWarning={true}>
           <div className="flex-1 relative">
             <TextareaAutosize
               value={input}
@@ -438,6 +441,7 @@ export function SmartDiagnosisChatInterface({
               minRows={1}
               maxRows={4}
               disabled={isLoading || isAnalyzing}
+              suppressHydrationWarning={true}
             />
           </div>
           <Button
@@ -474,6 +478,13 @@ export function SmartDiagnosisChatInterface({
           ))}
         </div>
       </div>
+
+      {/* 数据包分析全屏对话框 */}
+      <PacketCaptureFullscreenDialog
+        isOpen={isPacketCaptureDialogOpen}
+        onClose={() => setIsPacketCaptureDialogOpen(false)}
+        onMinimize={() => setIsPacketCaptureDialogOpen(false)}
+      />
     </div>
   );
-} 
+}

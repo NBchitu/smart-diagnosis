@@ -1,7 +1,19 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Wifi, Globe, Zap, Video, RefreshCw, MessageCircle, Search, Filter, ChevronDown, ChevronUp, Activity, Server, Timer, AlertTriangle, Eye, BarChart3, Download, History, ToggleLeft, ToggleRight, FileText, Brain, Clock, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+// 安全的日期格式化组件，避免水合错误
+const SafeDateDisplay = ({ dateString }: { dateString: string }) => {
+  const [formattedDate, setFormattedDate] = useState<string>('');
+
+  useEffect(() => {
+    // 只在客户端格式化日期
+    setFormattedDate(new Date(dateString).toLocaleString('zh-CN'));
+  }, [dateString]);
+
+  return <span suppressHydrationWarning>{formattedDate}</span>;
+};
 
 const PRESET_ISSUES = [
   { key: "website_access", label: "网站访问问题", icon: <Globe className="w-5 h-5" />, description: "分析HTTP/HTTPS网站访问性能和问题" },
@@ -506,6 +518,7 @@ export default function NetworkCaptureAITestPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white shadow-sm"
+                suppressHydrationWarning={true}
               />
             </div>
 
@@ -768,6 +781,7 @@ export default function NetworkCaptureAITestPage() {
               value={custom}
               onChange={handleCustomChange}
               maxLength={50}
+              suppressHydrationWarning={true}
             />
             <MessageCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
           </div>
@@ -839,6 +853,7 @@ export default function NetworkCaptureAITestPage() {
                   checked={captureConfig.enableDeepAnalysis}
                   onChange={(e) => setCaptureConfig(prev => ({ ...prev, enableDeepAnalysis: e.target.checked }))}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  suppressHydrationWarning={true}
                 />
                 <label htmlFor="deepAnalysis" className="ml-2 text-xs text-gray-700">
                   启用深度分析 (包含应用层协议解析)
@@ -954,7 +969,7 @@ export default function NetworkCaptureAITestPage() {
         )}
 
         {/* 额外的AI分析入口 - 确保始终可用 */}
-        <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="mt-6 pt-4 border-t border-gray-200 hidden">
           <div className="text-center">
             <p className="text-sm text-gray-600 mb-3">数据预处理完成，可以开始AI分析</p>
             <button
@@ -1381,7 +1396,7 @@ export default function NetworkCaptureAITestPage() {
     <div className="flex flex-col h-full bg-gray-50">
       {/* 顶部栏 */}
       <header className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">网络抓包+AI分析调测</h1>
+        <h1 className="text-lg font-bold text-gray-900">网络自动抓包+AI分析</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
@@ -1495,7 +1510,7 @@ export default function NetworkCaptureAITestPage() {
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <Clock className="w-4 h-4 text-blue-500 flex-shrink-0" />
                             <span className="text-sm font-medium text-gray-900">
-                              {new Date(record.capture_time).toLocaleString('zh-CN')}
+                              <SafeDateDisplay dateString={record.capture_time} />
                             </span>
                             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">#{record.task_id.slice(-8)}</span>
                           </div>

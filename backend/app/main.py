@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List
 from contextlib import asynccontextmanager
 
-from app.api import network, wifi, router, ai, system, mcp, capture
+from app.api import network, wifi, router, ai, system, mcp, capture, speed_test, traceroute, dns_test, port_scan, ssl_check, network_quality
 from app.core.websocket import WebSocketManager
 from app.mcp.manager import mcp_manager
 
@@ -63,6 +63,14 @@ app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
 app.include_router(capture.router, prefix="/api/capture", tags=["capture"])
+
+# 新增的诊断工具路由
+app.include_router(speed_test.router, prefix="/api", tags=["speed-test"])
+app.include_router(traceroute.router, prefix="/api", tags=["traceroute"])
+app.include_router(dns_test.router, prefix="/api", tags=["dns-test"])
+app.include_router(port_scan.router, prefix="/api", tags=["port-scan"])
+app.include_router(ssl_check.router, prefix="/api", tags=["ssl-check"])
+app.include_router(network_quality.router, prefix="/api", tags=["network-quality"])
 
 # 挂载网站截图静态文件目录
 from pathlib import Path
